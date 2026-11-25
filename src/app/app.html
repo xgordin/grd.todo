@@ -1,0 +1,40 @@
+@if (user(); as signedInUser) {
+  @defer (on immediate) {
+    <app-todo [user]="signedInUser" (logout)="updateSession()" />
+  } @placeholder {
+    <div class="account" role="status">Abrindo seu espaço…</div>
+  }
+} @else {
+  <main class="account">
+    <section class="account__card" aria-labelledby="account-title">
+      <div class="account__mark"><i class="pi pi-check" aria-hidden="true"></i></div>
+      <h1 id="account-title">grd.todo</h1>
+      <h2>Uma tarefa de cada vez.</h2>
+      <p>Organize suas listas e transforme grandes planos em pequenas etapas.</p>
+      @if (!authConfigured) {
+        <p role="status">O Firebase ainda não está configurado para este ambiente.</p>
+      } @else if (restoringSession()) {
+        <p role="status">Verificando sua sessão…</p>
+      } @else {
+        <p-button
+          label="Entrar com Google"
+          icon="pi pi-sign-in"
+          [loading]="busy()"
+          (onClick)="updateSession()"
+        />
+        @if (localMode) {
+          <small>Ambiente local. Use uma conta de teste no emulador.</small>
+        }
+      }
+      @if (error(); as message) {
+        <p class="account__error" role="alert">{{ message }}</p>
+      }
+    </section>
+  </main>
+}
+@if (user() && error()) {
+  <div class="session-error" role="alert">
+    <span>{{ error() }}</span>
+    <button type="button" aria-label="Fechar aviso" (click)="error.set('')">Fechar</button>
+  </div>
+}

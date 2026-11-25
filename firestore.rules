@@ -1,0 +1,73 @@
+// Dados privados por conta em users/{uid}/{lists,tasks,steps}/{id}.
+// Campos comuns: title (1 a 240 caracteres, 80 para listas), archived (bool),
+// createdAt (timestamp imutável) e updatedAt (timestamp do servidor).
+// tasks têm listId (imutável, "inbox" ou lista existente), completed e important.
+// steps têm taskId (imutável, tarefa existente) e completed.
+// Exclusões são lógicas via archived.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validBase(data, fields, maxTitle) {
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.title is string && data.title.size() > 0 && data.title.size() <= maxTitle
+        && data.title.matches('.*[^\\s].*')
+        && data.archived is bool
+        && data.createdAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function validList(data) {
+      return validBase(data, ['title', 'archived', 'createdAt', 'updatedAt'], 80);
+    }
+
+    function activeList(uid, listId) {
+      return listId == 'inbox'
+        || (exists(/databases/$(database)/documents/users/$(uid)/lists/$(listId))
+          && !get(/databases/$(database)/documents/users/$(uid)/lists/$(listId)).data.archived);
+    }
+
+    function validTask(uid, data) {
+      return validBase(data, ['title', 'archived', 'createdAt', 'updatedAt', 'listId', 'completed', 'important'], 240)
+        && data.listId is string && data.listId.size() > 0 && data.listId.size() <= 128
+        && data.completed is bool && data.important is bool
+        && activeList(uid, data.listId);
+    }
+
+    function validStep(uid, data) {
+      let task = get(/databases/$(database)/documents/users/$(uid)/tasks/$(data.taskId));
+      return validBase(data, ['title', 'archived', 'createdAt', 'updatedAt', 'taskId', 'completed'], 240)
+        && data.taskId is string && data.taskId.size() > 0 && data.taskId.size() <= 128
+        && data.completed is bool && !task.data.archived && activeList(uid, task.data.listId);
+    }
+
+    match /users/{uid}/lists/{listId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validList(request.resource.data)
+        && request.resource.data.createdAt == request.time && !request.resource.data.archived;
+      allow update: if isOwner(uid) && validList(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt && !resource.data.archived;
+    }
+
+    match /users/{uid}/tasks/{taskId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validTask(uid, request.resource.data)
+        && request.resource.data.createdAt == request.time && !request.resource.data.archived;
+      allow update: if isOwner(uid) && validTask(uid, request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.listId == resource.data.listId && !resource.data.archived;
+    }
+
+    match /users/{uid}/steps/{stepId} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validStep(uid, request.resource.data)
+        && request.resource.data.createdAt == request.time && !request.resource.data.archived;
+      allow update: if isOwner(uid) && validStep(uid, request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.taskId == resource.data.taskId && !resource.data.archived;
+    }
+  }
+}

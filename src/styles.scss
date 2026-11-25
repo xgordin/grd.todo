@@ -1,0 +1,65 @@
+@import 'primeicons/primeicons.css';
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: #304733;
+  background: #fdfdfa;
+}
+button,
+input {
+  font: inherit;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #527e4f;
+  outline-offset: 3px;
+}
+button:disabled {
+  cursor: default;
+}
+
+.task-panel {
+  --p-panel-border-color: #e4e8dc;
+  --p-panel-border-radius: 10px;
+  --p-panel-background: #ffffff;
+  --p-panel-header-background: #ffffff;
+  --p-panel-header-padding: 15px 18px;
+  --p-panel-content-padding: 0 18px 14px;
+  --p-panel-toggleable-header-padding: 12px 16px;
+}
+.task-panel .p-panel-header {
+  gap: 4px;
+}
+.task-panel .p-panel-header > .task-header {
+  flex: 1;
+}
+.task-panel .p-panel-toggle-button {
+  width: 32px;
+  height: 32px;
+}
+.task-panel .p-checkbox-box {
+  border-radius: 50%;
+}
+.mobile-menu {
+  display: none !important;
+}
+.p-button {
+  font-size: 13px;
+}
+.p-dialog {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .mobile-menu {
+    display: inline-flex !important;
+  }
+  .task-panel {
+    --p-panel-toggleable-header-padding: 12px;
+    --p-panel-content-padding: 0 12px 12px;
+  }
+}

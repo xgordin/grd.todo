@@ -1,0 +1,373 @@
+<div class="workspace">
+  @if (sidebarOpen()) {
+    <button
+      class="nav-overlay"
+      aria-label="Fechar navegação"
+      (click)="sidebarOpen.set(false)"
+    ></button>
+  }
+  <aside class="sidebar" [class.sidebar--open]="sidebarOpen()" aria-label="Navegação de listas" (keydown.escape)="sidebarOpen.set(false)">
+    <a class="brand" href="/" aria-label="grd.todo, início">
+      <span class="brand-mark"><i class="pi pi-check" aria-hidden="true"></i></span>
+      grd<span class="brand-dot">.</span>todo
+    </a>
+
+    <div class="workspace-label">MEU ESPAÇO</div>
+    <nav class="list-nav" aria-label="Tarefas">
+      <button
+        [class.active]="view() === 'all'"
+        [attr.aria-current]="view() === 'all' ? 'page' : null"
+        (click)="selectView('all')"
+      >
+        <i class="pi pi-inbox" aria-hidden="true"></i><span>Minhas tarefas</span
+        ><span class="count">{{ pendingCount() }}</span>
+      </button>
+      <button
+        [class.active]="view() === 'important'"
+        [attr.aria-current]="view() === 'important' ? 'page' : null"
+        (click)="selectView('important')"
+      >
+        <i class="pi pi-star" aria-hidden="true"></i><span>Importantes</span
+        ><span class="count">{{ importantCount() }}</span>
+      </button>
+    </nav>
+
+    <div class="lists-heading">
+      <span>SUAS LISTAS</span
+      ><p-button
+        icon="pi pi-plus"
+        [text]="true"
+        severity="secondary"
+        [rounded]="true"
+        ariaLabel="Criar lista"
+        (onClick)="edit('list')"
+      />
+    </div>
+    <nav class="list-nav custom-lists" aria-label="Listas pessoais">
+      @for (list of store.lists(); track list.id) {
+        <button
+          [class.active]="view() === list.id"
+          [attr.aria-current]="view() === list.id ? 'page' : null"
+          (click)="selectView(list.id)"
+        >
+          <i class="pi pi-list" aria-hidden="true"></i><span>{{ list.title }}</span
+          ><span class="count">{{ listCount(list.id) }}</span>
+        </button>
+      }
+      <button class="new-list" (click)="edit('list')">
+        <i class="pi pi-plus" aria-hidden="true"></i><span>Nova lista</span>
+      </button>
+    </nav>
+
+    <div class="profile">
+      <span class="avatar">{{
+        (user().displayName || user().email || 'U').slice(0, 1).toUpperCase()
+      }}</span>
+      <div class="profile-copy">
+        <strong>{{ user().displayName || 'Meu perfil' }}</strong><span>{{ user().email }}</span>
+      </div>
+      <p-button
+        icon="pi pi-sign-out"
+        [text]="true"
+        severity="secondary"
+        ariaLabel="Sair da conta"
+        (onClick)="logout.emit()"
+      />
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <p-button
+        styleClass="mobile-menu"
+        icon="pi pi-bars"
+        [text]="true"
+        severity="secondary"
+        ariaLabel="Abrir navegação"
+        (onClick)="sidebarOpen.set(true)"
+      />
+      <span class="date">{{ today }}</span>
+      <span class="sync-status" role="status"
+        ><span class="status-dot" [class.waiting]="!store.connected() || store.syncing()"></span
+        >{{
+          store.syncing() ? 'Salvando…' : store.connected() ? 'Sincronizado' : 'Conectando…'
+        }}</span
+      >
+    </div>
+
+    <div class="content">
+      <header class="page-heading">
+        <div>
+          <h1>{{ heading() }}</h1>
+          <p>
+            {{ scopedTasks().length - completedCount() }} pendentes<span class="separator">·</span
+            >{{ completedCount() }} concluídas
+          </p>
+        </div>
+        @if (currentList(); as list) {
+          <div class="list-actions">
+            <p-button
+              icon="pi pi-pencil"
+              [text]="true"
+              severity="secondary"
+              ariaLabel="Renomear lista"
+              (onClick)="edit('list', list)"
+              [disabled]="saving()"
+            />
+            <p-button
+              icon="pi pi-trash"
+              [text]="true"
+              severity="secondary"
+              ariaLabel="Excluir lista"
+              (onClick)="remove('list', list)"
+              [disabled]="saving()"
+            />
+          </div>
+        }
+      </header>
+
+      <form class="task-composer" (ngSubmit)="addTask()">
+        <i class="pi pi-plus" aria-hidden="true"></i>
+        <input
+          pInputText
+          name="taskTitle"
+          [(ngModel)]="taskTitle"
+          maxlength="240"
+          autocomplete="off"
+          aria-label="Nova tarefa"
+          placeholder="O que você precisa fazer?"
+          [disabled]="store.loading() || saving() || !!store.error()"
+        />
+        <p-button
+          type="submit"
+          label="Adicionar"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          [disabled]="!taskTitle.trim() || saving() || store.loading() || !!store.error()"
+        />
+      </form>
+
+      <div class="task-toolbar">
+        <div class="filters" aria-label="Filtrar tarefas">
+          <button
+            [class.selected]="filter() === 'pending'"
+            [attr.aria-pressed]="filter() === 'pending'"
+            (click)="filter.set('pending')"
+          >
+            Pendentes
+          </button>
+          <button
+            [class.selected]="filter() === 'completed'"
+            [attr.aria-pressed]="filter() === 'completed'"
+            (click)="filter.set('completed')"
+          >
+            Concluídas
+          </button>
+          <button
+            [class.selected]="filter() === 'all'"
+            [attr.aria-pressed]="filter() === 'all'"
+            (click)="filter.set('all')"
+          >
+            Todas
+          </button>
+        </div>
+        <div class="search">
+          <i class="pi pi-search" aria-hidden="true"></i
+          ><input
+            pInputText
+            [ngModel]="query()"
+            (ngModelChange)="query.set($event)"
+            aria-label="Buscar tarefas e etapas"
+            placeholder="Buscar tarefa ou etapa"
+          />
+        </div>
+      </div>
+
+      @if (store.error()) {
+        <div class="connection-error" role="alert">{{ store.error() }}</div>
+      } @else if (store.loading()) {
+        <div class="empty-state" role="status">
+          <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+          <h2>Carregando suas tarefas</h2>
+          <p>Aguardando a conexão com o Firebase.</p>
+        </div>
+      } @else if (!visibleTasks().length) {
+        <div class="empty-state">
+          <div class="empty-icon">
+            <i
+              class="pi"
+              [class.pi-search]="!!query().trim()"
+              [class.pi-check-circle]="!query().trim()"
+              aria-hidden="true"
+            ></i>
+          </div>
+          <h2>
+            {{
+              query().trim()
+                ? 'Nenhuma tarefa encontrada'
+                : filter() === 'completed'
+                  ? 'Cada passo conta'
+                  : scopedTasks().length
+                    ? 'Tudo em dia por aqui'
+                    : 'Comece com uma tarefa'
+            }}
+          </h2>
+          <p>
+            {{
+              query().trim()
+                ? 'Tente buscar outro título ou uma etapa.'
+                : filter() === 'completed'
+                  ? 'As tarefas concluídas aparecerão aqui.'
+                  : 'Adicione uma tarefa acima e divida em pequenas etapas.'
+            }}
+          </p>
+        </div>
+      } @else {
+        <section class="task-list" aria-label="Lista de tarefas">
+          @for (task of visibleTasks(); track task.id) {
+            <p-panel
+              [toggleable]="true"
+              [collapsed]="true"
+              [toggleButtonProps]="{
+                ariaLabel: 'Mostrar ou ocultar etapas de ' + task.title,
+                severity: 'secondary',
+                text: true,
+                rounded: true,
+              }"
+              styleClass="task-panel"
+              [class.task-completed]="task.completed"
+            >
+              <ng-template #header>
+                <div class="task-header">
+                  <p-checkbox
+                    [binary]="true"
+                    [ngModel]="task.completed"
+                    (onChange)="toggleTask(task)"
+                    [disabled]="saving()"
+                    [ariaLabel]="(task.completed ? 'Reabrir ' : 'Concluir ') + task.title"
+                  />
+                  <button class="task-title" (click)="edit('task', task)" [disabled]="saving()">
+                    <span>{{ task.title }}</span><small
+                      >{{ completedSteps(task.id) }} de {{ stepsFor(task.id).length }} etapas</small
+                    >
+                  </button>
+                  <p-button
+                    [icon]="task.important ? 'pi pi-star-fill' : 'pi pi-star'"
+                    [text]="true"
+                    [severity]="task.important ? 'warn' : 'secondary'"
+                    [ariaLabel]="
+                      (task.important ? 'Remover importância de ' : 'Marcar como importante ') +
+                      task.title
+                    "
+                    [disabled]="saving()"
+                    (onClick)="toggleImportant(task)"
+                  />
+                </div>
+              </ng-template>
+              <div class="steps">
+                @for (step of stepsFor(task.id); track step.id) {
+                  <div class="step" [class.step-completed]="step.completed">
+                    <p-checkbox
+                      [binary]="true"
+                      [ngModel]="step.completed"
+                      (onChange)="toggleStep(step)"
+                      [disabled]="saving()"
+                      [ariaLabel]="
+                        (step.completed ? 'Reabrir etapa ' : 'Concluir etapa ') + step.title
+                      "
+                    />
+                    <button class="step-title" (click)="edit('step', step)" [disabled]="saving()">
+                      {{ step.title }}
+                    </button>
+                    <p-button
+                      icon="pi pi-times"
+                      [text]="true"
+                      severity="secondary"
+                      [ariaLabel]="'Excluir etapa ' + step.title"
+                      [disabled]="saving()"
+                      (onClick)="remove('step', step)"
+                    />
+                  </div>
+                }
+                <form class="step-composer" (ngSubmit)="addStep(task.id)">
+                  <i class="pi pi-plus" aria-hidden="true"></i>
+                  <input
+                    pInputText
+                    [name]="'step-' + task.id"
+                    [(ngModel)]="stepTitles[task.id]"
+                    maxlength="240"
+                    aria-label="Nova etapa"
+                    placeholder="Adicionar uma etapa"
+                    [disabled]="saving()"
+                  />
+                  <p-button
+                    type="submit"
+                    icon="pi pi-arrow-up"
+                    [text]="true"
+                    ariaLabel="Adicionar etapa"
+                    [disabled]="!stepTitles[task.id]?.trim() || saving()"
+                  />
+                </form>
+                <div class="task-footer">
+                  <p-button
+                    label="Excluir tarefa"
+                    icon="pi pi-trash"
+                    [text]="true"
+                    severity="danger"
+                    size="small"
+                    [disabled]="saving()"
+                    (onClick)="remove('task', task)"
+                  />
+                </div>
+              </div>
+            </p-panel>
+          }
+        </section>
+      }
+    </div>
+  </main>
+</div>
+
+<p-dialog
+  [(visible)]="editorVisible"
+  [header]="editorHeading"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '420px', maxWidth: 'calc(100vw - 32px)' }"
+  [closable]="!saving()"
+  [closeOnEscape]="!saving()"
+>
+  <form class="editor" (ngSubmit)="saveEditor()">
+    <label for="editor-title">{{ editorKind === 'list' ? 'Nome da lista' : 'Título' }}</label>
+    <input
+      pInputText
+      id="editor-title"
+      name="editorTitle"
+      [(ngModel)]="editorTitle"
+      [maxlength]="editorKind === 'list' ? 80 : 240"
+      autocomplete="off"
+      [disabled]="saving()"
+      autofocus
+    />
+    <div class="editor-actions">
+      <p-button
+        label="Cancelar"
+        severity="secondary"
+        [text]="true"
+        (onClick)="editorVisible = false"
+        [disabled]="saving()"
+      /><p-button
+        type="submit"
+        label="Salvar"
+        [disabled]="!editorTitle.trim() || saving()"
+        [loading]="saving()"
+      />
+    </div>
+  </form>
+</p-dialog>
+<p-confirmdialog [style]="{ width: '420px', maxWidth: 'calc(100vw - 32px)' }" />
+<p-toast
+  position="bottom-right"
+  [breakpoints]="{ '600px': { width: 'calc(100% - 24px)', right: '12px' } }"
+/>
